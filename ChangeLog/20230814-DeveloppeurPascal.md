@@ -12,3 +12,7 @@
 
 * added API to send a code
 * added a REST Debugger test for the send code API
+
+* updated FR/EN doc
+
+* added a doc in REST Debugger folder
