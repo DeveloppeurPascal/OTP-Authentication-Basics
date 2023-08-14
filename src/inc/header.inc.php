@@ -1,5 +1,5 @@
 <?php
-	// OPT Authentication Basics
+	// OTP Authentication Basics
 	// (c) Patrick Prémartin
 	//
 	// Distributed under license AGPL.
@@ -7,7 +7,7 @@
 	// Infos and updates :
 	// https://github.com/DeveloppeurPascal/OTP-Authentication-Basics
 ?><header>
-	<h1>OPT Authentication Basics</h1>
+	<h1>OTP Authentication Basics</h1>
 	<p>Open source project available on <a href="https://github.com/DeveloppeurPascal/OTP-Authentication-Basics">GitHub</a>.</p>
 	<p><?php
 		print("<button onclick=\"document.location = 'index.php'; return true;\">Home</button> ");

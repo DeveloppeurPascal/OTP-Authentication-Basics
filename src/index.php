@@ -1,5 +1,5 @@
 <?php
-	// OPT Authentication Basics
+	// OTP Authentication Basics
 	// (c) Patrick Prémartin
 	//
 	// Distributed under license AGPL.
@@ -15,7 +15,7 @@
 		<meta charset="UTF-8">
 		<meta http-equiv="content-type" content="text/html; charset=UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes">
-		<title>OPT Authentication Basics</title>
+		<title>OTP Authentication Basics</title>
 	</head>
 	<body><?php include_once(__DIR__."/inc/header.inc.php"); ?>
 		<h2>Home</h2>

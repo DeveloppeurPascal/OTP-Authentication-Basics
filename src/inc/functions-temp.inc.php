@@ -1,5 +1,5 @@
 <?php
-	// OPT Authentication Basics
+	// OTP Authentication Basics
 	// (c) Patrick Prémartin
 	//
 	// Distributed under license AGPL.
