@@ -24,7 +24,6 @@
 
 	$error = false;
 	$error_message = "";
-	$DefaultField = "User";
 
 	if (isset($_POST["frm"]) && ("1" == $_POST["frm"])) {
 		$email = isset($_POST["user"])?trim(strip_tags($_POST["user"])):"";
@@ -49,27 +48,8 @@
 					$OTPAuthStatus = COTPAuthForm;
 				}
 				if (! $error) {
-					// TODO
-					$OTP_code = getNewIdNumber(6);
-					require_once(__DIR__."/inc/functions-temp.inc.php");
-					$TempData = LoadTempFile(getTempFileName($email));
-					if (! isset($TempData->OTPCode)) {
-						$TempData->OTPCode = array();
-					}
-					if (! isset($TempData->OTPCode[$email])) {
-						$TempData->OTPCode[$email] = new stdClass();
-					}
-					$TempData->OTPCode[$email]->CodeOTP = $OTP_code;
-					$TempData->OTPCode[$email]->Expiration = time()+60*60; // 1 hour
-					SaveTempFile($TempData);
-					if (_DEBUG)
-					{
-						mail($email, "Connection code", "Hi\n\nHere is your new code for site XXX : ".$OTP_code."\n\nBest regards\n\nThe team");
-					}
-					else {
-						// TODO : replace this by an email check link
-						die("Sending a connexion email is not available here.");
-					}
+					require_once(__DIR__."/inc/functions-OTP.inc.php");
+					OTP_Send_Code($email);
 					$OTPAuthStatus = COTPAuthWait;
 				}
 			}
@@ -105,50 +85,47 @@
 						$OTPAuthStatus = COTPAuthForm;
 					}
 					if (! $error) {
-						require_once(__DIR__."/inc/functions-temp.inc.php");
-						$TempData = LoadTempFile(getTempFileName($email));
-						if (isset($TempData->OTPCode[$email])) {
-							$code = isset($TempData->OTPCode[$email]->CodeOTP)?$TempData->OTPCode[$email]->CodeOTP:false;
-							$expiration = isset($TempData->OTPCode[$email]->Expiration)?$TempData->OTPCode[$email]->Expiration:0;
-							if ($code == $OTP_code) {
-								if ($expiration >= time()) {
-									unset($TempData->OTPCode[$email]);
-									SaveTempFile($TempData);
-									if (! is_object($rec)) {
-										$qry = $db->prepare("insert into users (email, enabled, create_ip, create_datetime) values (:e,1,:ci,:cdt)");
-										if (! $qry->execute(array(":e" => $email, ":ci" => $_SERVER["REMOTE_ADDR"], ":cdt" => date("YmdHis")))) {
-											$error = true;
-											$error_message .= "Can't add this user in the database.\n";
-											$OTPAuthStatus = COTPAuthForm;
-										}
-										else {
-											$id = $db->lastInsertId();
-										}
+						require_once(__DIR__."/inc/functions-OTP.inc.php");
+						switch (OTP_Check_Code($email, $OTP_code)) {
+							case OTPCheckOK :
+								if (! is_object($rec)) {
+									$qry = $db->prepare("insert into users (email, enabled, create_ip, create_datetime) values (:e,1,:ci,:cdt)");
+									if (! $qry->execute(array(":e" => $email, ":ci" => $_SERVER["REMOTE_ADDR"], ":cdt" => date("YmdHis")))) {
+										$error = true;
+										$error_message .= "Can't add this user in the database.\n";
+										$OTPAuthStatus = COTPAuthForm;
 									}
 									else {
-										$id = $rec->id;
-									}
-									if (! $error) {
-										$qry = $db->prepare("update users set email_checked=1, email_check_ip=:ip, email_check_datetime=:dt where id=:id");
-										$qry->execute(array(":ip" => $_SERVER["REMOTE_ADDR"], ":dt" => date("YmdHis"), ":id" => $id));
-										setCurrentUserId($id);
-										setCurrentUserEmail($email);
-										header("location: ".URL_CONNECTED_USER_HOMEPAGE);
-										exit;
+										$id = $db->lastInsertId();
 									}
 								}
 								else {
-									$error = true;
-									$error_message .= "Too late. The code expired. Send a new one.\n";
-									$OTPAuthStatus = COTPAuthForm;
+									$id = $rec->id;
 								}
-							}
-							else {
-								// TODO : gérer un nombre de tentatives avant refus complet ou renvoi
+								if (! $error) {
+									$qry = $db->prepare("update users set email_checked=1, email_check_ip=:ip, email_check_datetime=:dt where id=:id");
+									$qry->execute(array(":ip" => $_SERVER["REMOTE_ADDR"], ":dt" => date("YmdHis"), ":id" => $id));
+									setCurrentUserId($id);
+									setCurrentUserEmail($email);
+									header("location: ".URL_CONNECTED_USER_HOMEPAGE);
+									exit;
+								}
+								break;
+							case OTPCheckExpired:
+								$error = true;
+								$error_message .= "Too late. The code expired. Send a new one.\n";
+								$OTPAuthStatus = COTPAuthForm;
+								break;
+							case OTPCheckWrong:
 								$error = true;
 								$error_message .= "Wrong code, please retry or resend one.\n";
 								$OTPAuthStatus = COTPAuthWait;
-							}
+								break;
+							case OTPCheckUnknow:
+								$error = true;
+								$error_message .= "LOL\n";
+								$OTPAuthStatus = COTPAuthForm;
+								break;
 						}
 					}
 				}
@@ -187,7 +164,7 @@
 			</p>
 		</form>
 <script>
-	document.getElementById('<?php print($DefaultField); ?>').focus();
+	document.getElementById('User').focus();
 	function ValidForm() {
 		email = document.getElementById('User');
 		if (0 == email.value.length) {
@@ -201,7 +178,7 @@
 			break;
 		case COTPAuthWait:
 ?><p>We sent a code by email to your address. Please write it below.</p>
-<form id="MyForm" method="POST" action="login.php" onXXXSubmit="return ValidForm();"><input type="hidden" id="Frm" name="frm" value="2"><input id="User" name="user" type="hidden" value="<?php print(isset($email)?htmlspecialchars($email):""); ?>">
+<form id="MyForm" method="POST" action="login.php" onSubmit="return ValidForm();"><input type="hidden" id="Frm" name="frm" value="2"><input id="User" name="user" type="hidden" value="<?php print(isset($email)?htmlspecialchars($email):""); ?>">
 	<p>
 		<label for="Code">Received code</label><br>
 		<input id="Code" name="code" type="text" value="" prompt="The temporary code we sent you">
@@ -211,6 +188,22 @@
 	</p>
 </form>
 <p>Of course check your spams if you didn't see it in your inbox or you can <a href="#" onclick="ReSendCode();">ask a new code</a>.</p><script>
+	document.getElementById('Code').focus();
+	function ValidForm() {
+		code = document.getElementById('Code');
+		if (0 == code.value.length) {
+			code.focus();
+			window.alert('The code is needed !');
+			return false;
+		}
+		else if (6 != code.value.length) {
+			code.focus();
+			window.alert('Wrong code !');
+			return false;
+		}
+		// TODO : check if the code has only 6 numbers (or other scheme depending on how its generated)
+		return true;
+	}
 	function ReSendCode() {
 		document.getElementById('Frm').value = '1';
 		document.getElementById('Code').value = 'XXXXXXXXXX';
