@@ -95,6 +95,7 @@
 								$TempData->Sessions[$SessionID]->id = $id;
 								$TempData->Sessions[$SessionID]->email = $email;
 								$TempData->Sessions[$SessionID]->datetime = time();
+								SaveTempFile($TempData);
 								$result->sessid = $SessionID;
 								// TODO : manage sessions a an include file with global functions (getSessionValue / setSessionValue)
 							}
