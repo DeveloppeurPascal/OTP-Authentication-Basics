@@ -20,14 +20,20 @@ type
     TabItem2: TTabItem;
     TabItem3: TTabItem;
     lblSessionID: TLabel;
+    btnSendCodeAgain: TButton;
     procedure FormCreate(Sender: TObject);
     procedure btnSendOTPClick(Sender: TObject);
     procedure btnConnectClick(Sender: TObject);
     procedure btnLogoutClick(Sender: TObject);
+    procedure btnSendCodeAgainClick(Sender: TObject);
   private
-    { Déclarations privées }
+    FEmail: string;
+    FSessionID: string;
+    procedure SetEmail(const Value: string);
+    procedure SetSessionID(const Value: string);
   public
-    { Déclarations publiques }
+    property Email: string read FEmail write SetEmail;
+    property SessionID: string read FSessionID write SetSessionID;
   end;
 
 var
@@ -42,9 +48,6 @@ uses
   uOTPAPICall;
 
 procedure TForm1.btnConnectClick(Sender: TObject);
-var
-  jso: TJSONObject;
-  SessionID: string;
 begin
   if edtOTPCode.Text.IsEmpty then
   begin
@@ -53,42 +56,58 @@ begin
   end
   else
   begin
-    // // dmapicall.OTPCheckRequest.Params.Items[0].Value := edtEmail.Text;
-    // dmapicall.OTPCheckRequest.Params.Items
-    // [dmapicall.OTPCheckRequest.Params.IndexOf('email')].Value :=
-    // edtEmail.Text;
-    // // dmapicall.OTPCheckRequest.Params.Items[1].Value := edtOTPCode.Text;
-    // dmapicall.OTPCheckRequest.Params.Items
-    // [dmapicall.OTPCheckRequest.Params.IndexOf('code')].Value := edtOTPCode.Text;
-    // dmapicall.OTPCheckRequest.Execute;
-    // if (dmapicall.OTPCheckResponse.StatusCode <> 200) then
-    // raise exception.Create(dmapicall.OTPCheckResponse.JSONText)
-    // else if (dmapicall.OTPCheckResponse.JSONValue is TJSONObject) then
-    // begin
-    // jso := dmapicall.OTPCheckResponse.JSONValue as TJSONObject;
-    // if jso.TryGetValue<string>('sessid', SessionID) then
-    // begin
-    // lblSessionID.Text := SessionID;
-    // TabControl1.Next;
-    // end
-    // else
-    // raise exception.Create('Unknow session ID.' + slinebreak +
-    // dmapicall.OTPCheckResponse.JSONText); // Don't do it in production !
-    // end
-    // else
-    // raise exception.Create('Wrong answer format.' + slinebreak +
-    // dmapicall.OTPCheckResponse.JSONText); // Don't do it in production !
+    btnConnect.Enabled := false;
+    OTP_Check_Code_async(Email, edtOTPCode.Text,
+      procedure(AsessionID: string)
+      begin
+        btnConnect.Enabled := true;
+        SessionID := AsessionID;
+        edtOTPCode.Text := '';
+        TabControl1.Next;
+      end,
+      procedure(Const E: exception)
+      begin
+        btnConnect.Enabled := true;
+        if assigned(E) then
+          raise E;
+      end);
   end;
 end;
 
 procedure TForm1.btnLogoutClick(Sender: TObject);
 begin
-  // dmapicall.OTPLogoutRequest.Params.Items[0].Value := lblSessionID.Text;
-  // dmapicall.OTPLogoutRequest.Execute;
-  // if (dmapicall.OTPSendResponse.StatusCode <> 200) then
-  // raise exception.Create(dmapicall.OTPSendResponse.JSONText)
-  // else
-  // TabControl1.GotoVisibleTab(0);
+  btnLogout.Enabled := false;
+  OTP_Logout_Async(SessionID,
+    procedure
+    begin
+      btnLogout.Enabled := true;
+      SessionID := '';
+      Email := '';
+      TabControl1.GotoVisibleTab(0);
+    end,
+    procedure(Const E: exception)
+    begin
+      btnLogout.Enabled := true;
+      if assigned(E) then
+        raise E;
+    end);
+end;
+
+procedure TForm1.btnSendCodeAgainClick(Sender: TObject);
+begin
+  btnSendCodeAgain.Enabled := false;
+  OTP_Send_Code_Async(Email,
+    procedure
+    begin
+      btnSendCodeAgain.Enabled := true;
+      showmessage('New code sent.');
+    end,
+    procedure(Const E: exception)
+    begin
+      btnSendCodeAgain.Enabled := true;
+      if assigned(E) then
+        raise E;
+    end);
 end;
 
 procedure TForm1.btnSendOTPClick(Sender: TObject);
@@ -99,17 +118,41 @@ begin
     raise exception.Create('Please give your email !');
   end
   else
-    try
-      OTP_Send_Code(edtEmail.Text);
-      TabControl1.Next;
-    except
-      raise;
-    end;
+  begin
+    btnSendOTP.Enabled := false;
+    OTP_Send_Code_Async(edtEmail.Text,
+      procedure
+      begin
+        btnSendOTP.Enabled := true;
+        Email := edtEmail.Text;
+        edtEmail.Text := '';
+        TabControl1.Next;
+      end,
+      procedure(Const E: exception)
+      begin
+        btnSendOTP.Enabled := true;
+        if assigned(E) then
+          raise E;
+      end);
+  end;
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   TabControl1.ActiveTab := TabItem1;
+  FEmail := '';
+  FSessionID := '';
+end;
+
+procedure TForm1.SetEmail(const Value: string);
+begin
+  FEmail := Value;
+end;
+
+procedure TForm1.SetSessionID(const Value: string);
+begin
+  FSessionID := Value;
+  lblSessionID.Text := FSessionID;
 end;
 
 end.
