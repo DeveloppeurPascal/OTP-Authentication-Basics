@@ -25,9 +25,10 @@ Type
   end;
 
   TOTPProc = reference to procedure;
-  TOTPProc<T> = reference to procedure(P: T);
+  TOTPProc<T> = reference to procedure(Const P: T);
   TOTPErrorProc = reference to procedure(Const E: exception);
   TOTPEvent = procedure of object;
+  TOTPEvent<T> = procedure(Const P: T) of object;
   TOTPErrorEvent = procedure(Const E: exception) of object;
 
 procedure OTP_Send_Code(email: string);
@@ -38,11 +39,17 @@ procedure OTP_Send_Code_Async(email: string; CallbackEvent: TOTPEvent;
 
 function OTP_Check_Code(email, code: string): string;
 procedure OTP_Check_Code_Async(email, code: string;
-  CallbackProc: TOTPProc<string>; ErrorCallbackProc: TOTPErrorProc = nil);
+  CallbackProc: TOTPProc<string>;
+  ErrorCallbackProc: TOTPErrorProc = nil); overload;
+procedure OTP_Check_Code_Async(email, code: string;
+  CallbackEvent: TOTPEvent<string>;
+  ErrorCallbackEvent: TOTPErrorEvent = nil); overload;
 
 procedure OTP_Logout(SessID: string);
 procedure OTP_Logout_Async(SessID: string; CallbackProc: TOTPProc;
-  ErrorCallbackProc: TOTPErrorProc = nil);
+  ErrorCallbackProc: TOTPErrorProc = nil); overload;
+procedure OTP_Logout_Async(SessID: string; CallbackEvent: TOTPEvent;
+  ErrorCallbackEvent: TOTPErrorEvent = nil); overload;
 
 implementation
 
@@ -63,7 +70,9 @@ begin
     Params := TStringList.Create;
     try
       Params.AddPair('email', email);
+{$IFDEF DEBUG}
       sleep(2000);
+{$ENDIF}
       HTTPResponse := HTTP.Post(CAPIURL + 'api-otp-send.php', Params);
       if HTTPResponse.StatusCode <> 200 then
       begin
@@ -124,7 +133,7 @@ begin
       if Assigned(CallbackEvent) then
         CallbackEvent;
     end,
-    procedure(const E: exception)
+    procedure(Const E: exception)
     begin
       if Assigned(ErrorCallbackEvent) then
         ErrorCallbackEvent(E);
@@ -146,7 +155,9 @@ begin
     try
       Params.AddPair('email', email);
       Params.AddPair('code', code);
+{$IFDEF DEBUG}
       sleep(2000);
+{$ENDIF}
       HTTPResponse := HTTP.Post(CAPIURL + 'api-otp-check.php', Params);
       try
         cas := HTTPResponse.ContentAsString(tencoding.utf8);
@@ -203,6 +214,22 @@ begin
     end).Start;
 end;
 
+procedure OTP_Check_Code_Async(email, code: string;
+CallbackEvent: TOTPEvent<string>; ErrorCallbackEvent: TOTPErrorEvent = nil);
+begin
+  OTP_Check_Code_Async(email, code,
+    procedure(Const SessID: string)
+    begin
+      if Assigned(CallbackEvent) then
+        CallbackEvent(SessID);
+    end,
+    procedure(Const E: exception)
+    begin
+      if Assigned(ErrorCallbackEvent) then
+        ErrorCallbackEvent(E);
+    end);
+end;
+
 procedure OTP_Logout(SessID: string);
 var
   HTTP: THTTPClient;
@@ -216,7 +243,9 @@ begin
     Params := TStringList.Create;
     try
       Params.AddPair('sessid', SessID);
+{$IFDEF DEBUG}
       sleep(2000);
+{$ENDIF}
       HTTPResponse := HTTP.Post(CAPIURL + 'api-logout.php', Params);
       if HTTPResponse.StatusCode <> 200 then
       begin
@@ -266,6 +295,22 @@ begin
               end);
       end;
     end).Start;
+end;
+
+procedure OTP_Logout_Async(SessID: string; CallbackEvent: TOTPEvent;
+ErrorCallbackEvent: TOTPErrorEvent = nil);
+begin
+  OTP_Logout_Async(SessID,
+    procedure
+    begin
+      if Assigned(CallbackEvent) then
+        CallbackEvent;
+    end,
+    procedure(Const E: exception)
+    begin
+      if Assigned(ErrorCallbackEvent) then
+        ErrorCallbackEvent(E);
+    end);
 end;
 
 end.
